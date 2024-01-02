@@ -28,7 +28,12 @@ export const PopUp = () => {
   const initialInputs = async (list: DataListType[]) => {
     if (typeof window !== undefined) {
       const observer = new MutationObserver((mutations) => {
-        const isGpt4 = window.location.href.includes("model=gpt-4") || document.querySelector("[type=file]")  
+        const isGpt4 = window.location.href.includes("model=gpt-4") || document.querySelector("[type=file]") != null
+        let div: HTMLDivElement | null;
+        if (isGpt4 && (div = document.getElementById("prompt-textarea_div_popup"))) {
+          div.style.paddingLeft = "55px"
+        }
+        console.log("isGpt4", isGpt4)
         mutations.forEach((mut) => {
           if (mut.target === window.document.body) {
             return ""
@@ -53,6 +58,7 @@ export const PopUp = () => {
               for (const classList of input.classList) {
                 div.classList.add(classList)
               }
+
               if (isGpt4) {
                 div.style.paddingLeft = "55px"
               }
@@ -61,6 +67,7 @@ export const PopUp = () => {
               input.parentElement.appendChild(div)
               input.style.display = "none"
 
+              console.log("Initiating in ", isGpt4, div)
               ReactDOM.createRoot(div).render(
                 <Editor input={input} items={list} />
               )

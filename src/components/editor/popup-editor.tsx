@@ -101,7 +101,7 @@ export type SerializedEmojiNode = Spread<
         />
       </g>
     </svg>`
-    // spanElement.appendChild(buttonEdit)
+    spanElement.appendChild(buttonEdit)
     spanElement.appendChild(buttonRemove)
     dom.appendChild(spanElement)
     return dom

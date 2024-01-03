@@ -144,7 +144,7 @@ function getBaseOptions(editor: LexicalEditor, items: DataListType[]) {
         onSelect: () =>
           editor.update(() => {
             // const selection = $getSelection()
-            $insertNodes([$createEmojiNode(item.title, `${item.title}`),  $createTextNode(' ')])
+            $insertNodes([$createEmojiNode(item.title, `${item.title}`, items),  $createTextNode(' ')])
             // selection!.insertNodes([
             //   $createEmojiNode(item.title, `${item.title}`)
             // ])

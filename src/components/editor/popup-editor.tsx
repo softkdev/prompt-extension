@@ -1,4 +1,5 @@
 import { LexicalComposerContext } from "@lexical/react/LexicalComposerContext"
+import { documentId } from "firebase/firestore"
 import type {
   EditorConfig,
   LexicalEditor,
@@ -9,6 +10,7 @@ import type {
 } from "lexical"
 import { TextNode } from "lexical"
 import { observer } from "rosma"
+import type { DataListType } from "~@minimal/sections/popup/view"
 
 export type SerializedEmojiNode = Spread<
   {
@@ -18,75 +20,7 @@ export type SerializedEmojiNode = Spread<
   SerializedTextNode
 >
 
-  export class EmojiNode extends TextNode {
-  __className: string
-
-  static getType(): string {
-    return "emoji"
-  }
-  static context = LexicalComposerContext
-
-  static clone(node: EmojiNode): EmojiNode {
-    return new EmojiNode(node.__className, node.__text, node.__key)
-  }
-
-  constructor(className: string, text: string, key?: NodeKey) {
-    super(text, key)
-    this.__className = className
-    this.handleRemoveItem = this.handleRemoveItem.bind(this)
-  }
-
-  handleRemoveItem() {
-    const editor: LexicalEditor = observer.get("editor")
-    editor.update(() => {
-      this.remove()
-    })
-  }
-
-  createDOM(config: EditorConfig): HTMLElement {
-    const handleEdit = () => {
-      console.log("EDOT: ")
-    }
-
-    const dom = document.createElement("span")
-    const inner = super.createDOM(config)
-    dom.className = this.__className
-    dom.classList.add(`key_emoji_${this.__emoji_key}`)
-    inner.className = "emoji-inner"
-
-    dom.style.borderRadius = "8px"
-    inner.style.color = "white"
-    dom.style.background =
-      " linear-gradient(95deg, #000 -2.16%, rgba(0, 0, 0, 0.42) 60.51%)"
-    dom.style.padding = "3px 8px"
-    dom.style.gap = "16px"
-    dom.style.display = "inline-flex"
-    dom.style.alignItems = "center"
-    dom.appendChild(inner)
-    const spanElement = document.createElement("span")
-
-    spanElement.style.gap = "8px"
-    spanElement.style.display = "flex"
-    spanElement.style.alignItems = "center"
-    const buttonEdit = document.createElement("button")
-    const buttonRemove = document.createElement("button")
-
-    buttonEdit.type = "button"
-    buttonRemove.type = "button"
-    buttonEdit.onclick = handleEdit
-    buttonRemove.onclick = this.handleRemoveItem
-    buttonEdit.innerHTML = `<svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none">
-      <path
-        d="M16.8652 1.94336H3.13477C2.47852 1.94336 1.94336 2.47852 1.94336 3.13477V16.8652C1.94336 17.5215 2.47852 18.0566 3.13477 18.0566H16.8652C17.5215 18.0566 18.0566 17.5215 18.0566 16.8652V3.13477C18.0566 2.47852 17.5215 1.94336 16.8652 1.94336ZM8.92578 5.77734H14.2227V11.0742L11.9883 8.83984L6.60547 14.2227L5.77734 13.3945L11.1602 8.01172L8.92578 5.77734Z"
-        fill="#757578"
-      />
-    </svg>`
-    buttonRemove.innerHTML = `<svg
+const removeSvg = `<svg
       xmlns="http://www.w3.org/2000/svg"
       width="20"
       height="20"
@@ -100,10 +34,127 @@ export type SerializedEmojiNode = Spread<
           fill="#D2D2D2"
         />
       </g>
-    </svg>`
+    </svg>`;
+
+const editSvg = `<svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none">
+      <path
+        d="M16.8652 1.94336H3.13477C2.47852 1.94336 1.94336 2.47852 1.94336 3.13477V16.8652C1.94336 17.5215 2.47852 18.0566 3.13477 18.0566H16.8652C17.5215 18.0566 18.0566 17.5215 18.0566 16.8652V3.13477C18.0566 2.47852 17.5215 1.94336 16.8652 1.94336ZM8.92578 5.77734H14.2227V11.0742L11.9883 8.83984L6.60547 14.2227L5.77734 13.3945L11.1602 8.01172L8.92578 5.77734Z"
+        fill="#757578"
+      />
+    </svg>`;
+
+function genMenu(items: DataListType[]): HTMLDivElement {
+  const div = document.createElement('div')
+  div.style.display = 'none';
+  div.style.position = 'absolute';
+  div.style.transform = 'translate(0px, calc(-100% - 20px))';
+  div.innerHTML = `
+   <ul style="background-color: rgb(0, 0, 0); padding: 8px; border-radius: 6px; min-width: 200px; display: flex; gap: 12px; flex-direction: column;">
+    <p class="MuiTypography-root MuiTypography-body1 css-ahj2mt-MuiTypography-root" style="color: rgb(185, 185, 185);">My Data Sets</p>` +
+    items.map((item, index) => {
+      return `
+      <li tabindex="-1" class="item selected" role="option" aria-selected="true" id="typeahead-item-${index}" style="color: rgb(255, 255, 255); border-radius: 6px; cursor: pointer;">${item.title}<span><i class="icon paragraph"></i></span>
+      </li>
+     `;
+    }).join('') +
+    `
+     </ul>
+     `;
+  return div
+}
+
+export class EmojiNode extends TextNode {
+  __className: string
+  __chip!: HTMLSpanElement
+  __menu!: HTMLDivElement
+
+  static getType(): string {
+    return "emoji"
+  }
+  static context = LexicalComposerContext
+
+  static clone(node: EmojiNode): EmojiNode {
+    return new EmojiNode(node.__className, node.__text, node.__items, node.__key)
+  }
+
+  constructor(className: string, text: string, private readonly __items: DataListType[], key?: NodeKey,) {
+    super(text, key)
+    this.__className = className
+    this.handleRemoveItem = this.handleRemoveItem.bind(this)
+    this.handleEdit = this.handleEdit.bind(this)
+    this.__menu = genMenu(__items)
+    console.log(this.__menu)
+    document.body.appendChild(this.__menu)
+    console.log("lis", ...this.__menu.querySelectorAll('li'));
+    [...this.__menu.querySelectorAll('li')].forEach(li => {
+      (li as HTMLLIElement).addEventListener('click', () => {
+        this.__menu.style.display = "none";
+        const editor: LexicalEditor = observer.get("editor")
+        editor.update(() => {
+          this.setTextContent(li.innerText.trim())
+        })
+      })
+    })
+  }
+
+  handleRemoveItem() {
+    const editor: LexicalEditor = observer.get("editor")
+    editor.update(() => {
+      this.remove()
+    })
+  }
+
+  handleEdit() {
+    const cbr = this.__chip.getBoundingClientRect()
+    const mbr = this.__menu.getClientRects()
+    this.__menu.style.display = "block";
+    this.__menu.style.left = `${cbr.left}px`
+    this.__menu.style.top = `${cbr.top + 20}px`
+
+    console.log(this.__menu,)
+    console.table([cbr, mbr])
+  }
+
+  createDOM(config: EditorConfig): HTMLElement {
+    const dom = document.createElement("span")
+    const inner = super.createDOM(config)
+    dom.className = this.__className
+    dom.classList.add(`key_emoji_${this.__emoji_key}`)
+    inner.className = "emoji-inner"
+
+    dom.style.borderRadius = "8px"
+    inner.style.color = "white"
+    dom.style.background = " linear-gradient(95deg, #000 -2.16%, rgba(0, 0, 0, 0.42) 60.51%)"
+    dom.style.padding = "3px 8px"
+    dom.style.gap = "16px"
+    dom.style.display = "inline-flex"
+    dom.style.alignItems = "center"
+
+    dom.appendChild(inner)
+
+    const spanElement = document.createElement("span")
+
+    spanElement.style.gap = "8px"
+    spanElement.style.display = "flex"
+    spanElement.style.alignItems = "center"
+    const buttonEdit = document.createElement("button")
+    const buttonRemove = document.createElement("button")
+
+    buttonEdit.type = "button"
+    buttonRemove.type = "button"
+    buttonEdit.onclick = this.handleEdit
+    buttonRemove.onclick = this.handleRemoveItem
+    buttonEdit.innerHTML = editSvg;
+    buttonRemove.innerHTML = removeSvg;
     spanElement.appendChild(buttonEdit)
     spanElement.appendChild(buttonRemove)
     dom.appendChild(spanElement)
+    this.__chip = dom
     return dom
   }
 
@@ -120,14 +171,14 @@ export type SerializedEmojiNode = Spread<
     return false
   }
 
-  static importJSON(serializedNode: SerializedEmojiNode): EmojiNode {
-    const node = $createEmojiNode(serializedNode.className, serializedNode.text)
-    node.setFormat(serializedNode.format)
-    node.setDetail(serializedNode.detail)
-    node.setMode(serializedNode.mode)
-    node.setStyle(serializedNode.style)
-    return node
-  }
+  //static importJSON(serializedNode: SerializedEmojiNode): EmojiNode {
+  //  const node = $createEmojiNode(serializedNode.className, serializedNode.text)
+  //  node.setFormat(serializedNode.format)
+  //  node.setDetail(serializedNode.detail)
+  //  node.setMode(serializedNode.mode)
+  //  node.setStyle(serializedNode.style)
+  //  return node
+  //}
 
   exportJSON(): SerializedEmojiNode {
     return {
@@ -151,7 +202,8 @@ export function $isEmojiNode(
 
 export function $createEmojiNode(
   className: string,
-  emojiText: string
+  emojiText: string,
+  items: DataListType[]
 ): EmojiNode {
-  return new EmojiNode(className, emojiText).setMode("token")
+  return new EmojiNode(className, emojiText, items).setMode("token")
 }

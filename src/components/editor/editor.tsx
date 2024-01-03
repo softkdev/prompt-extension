@@ -158,6 +158,7 @@ export function Editor({
     })
     editor.update(() => {
       const root = editorState.toJSON()
+      console.log(root)
       let text = ""
       root.root.children.forEach((line) => {
         // @ts-expect-error
